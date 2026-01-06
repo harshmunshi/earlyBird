@@ -28,7 +28,7 @@ export function BudgetSettingsDialog({ projectId, currentBudget }: { projectId: 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" title="Project Settings">
+                <Button variant="ghost" size="icon" title="Project Settings" suppressHydrationWarning>
                     <Settings className="h-4 w-4" />
                 </Button>
             </DialogTrigger>

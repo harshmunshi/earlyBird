@@ -14,15 +14,17 @@ import {
     DialogTrigger,
     DialogFooter
 } from "@/components/ui/dialog";
-import { useState, useEffect } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Loader2, Plus, Upload, X } from "lucide-react";
 import { createCost } from "@/lib/actions";
+import { upload } from "@vercel/blob/client";
 
 const schema = z.object({
     description: z.string().min(2, "Description required"),
     amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
     category: z.string().min(1, "Category required"),
     date: z.string(),
+    billUrl: z.string().optional(),
     splitType: z.enum(["equal", "exact", "percentage"]),
     splits: z.array(z.object({
         userId: z.string(),
@@ -47,6 +49,9 @@ type Member = {
 export function AddCostDialog({ projectId, members }: { projectId: string, members: Member[] }) {
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const inputFileRef = useRef<HTMLInputElement>(null);
+    const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
     const {
         register,
@@ -62,6 +67,7 @@ export function AddCostDialog({ projectId, members }: { projectId: string, membe
             category: "Operational",
             amount: 0,
             date: new Date().toISOString().split('T')[0],
+            billUrl: "",
             splitType: "equal",
             splits: members.map(m => ({ userId: m.user.id, amount: 0 }))
         }
@@ -87,9 +93,10 @@ export function AddCostDialog({ projectId, members }: { projectId: string, membe
     const onSubmit = async (data: any) => { // using any to bypass strict checks for now, safe enough
         setIsLoading(true);
         try {
-            await createCost(projectId, data);
+            await createCost(projectId, { ...data, billUrl: blobUrl });
             setOpen(false);
             reset();
+            setBlobUrl(null);
         } catch (error) {
             console.error(error);
             alert("Failed to add cost");
@@ -98,10 +105,31 @@ export function AddCostDialog({ projectId, members }: { projectId: string, membe
         }
     };
 
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (!event.target.files || event.target.files.length === 0) {
+            return;
+        }
+
+        const file = event.target.files[0];
+        setIsUploading(true);
+        try {
+            const newBlob = await upload(file.name, file, {
+                access: 'public',
+                handleUploadUrl: '/api/upload',
+            });
+            setBlobUrl(newBlob.url);
+        } catch (error) {
+            console.error(error);
+            alert("Upload failed");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button>
+                <Button suppressHydrationWarning>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Cost
                 </Button>
@@ -126,6 +154,54 @@ export function AddCostDialog({ projectId, members }: { projectId: string, membe
                         <div className="grid gap-2">
                             <Label htmlFor="date">Date</Label>
                             <Input id="date" type="date" {...register("date")} />
+                        </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label>Receipt (Optional)</Label>
+                        <div className="flex items-center gap-2">
+                            {blobUrl ? (
+                                <div className="flex items-center gap-2 text-sm bg-muted px-3 py-2 rounded-md border w-full justify-between">
+                                    <span className="truncate max-w-[200px] text-muted-foreground">Receipt uploaded</span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
+                                        onClick={() => {
+                                            setBlobUrl(null);
+                                            if (inputFileRef.current) inputFileRef.current.value = '';
+                                        }}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 w-full">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full"
+                                        onClick={() => inputFileRef.current?.click()}
+                                        disabled={isUploading}
+                                    >
+                                        {isUploading ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Upload className="mr-2 h-4 w-4" />
+                                        )}
+                                        {isUploading ? "Uploading..." : "Upload Receipt"}
+                                    </Button>
+                                    <input
+                                        ref={inputFileRef}
+                                        type="file"
+                                        className="hidden"
+                                        accept="image/*,application/pdf"
+                                        onChange={handleFileChange}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 

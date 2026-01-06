@@ -46,7 +46,7 @@ export function AddAllocationDialog({ projectId }: { projectId: string }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm">
+                <Button size="sm" suppressHydrationWarning>
                     <Plus className="mr-2 h-4 w-4" /> Add Item
                 </Button>
             </DialogTrigger>

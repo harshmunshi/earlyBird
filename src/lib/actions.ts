@@ -21,6 +21,7 @@ const createCostSchema = z.object({
     amount: z.number(),
     category: z.string(),
     date: z.string(),
+    billUrl: z.string().optional(),
     splitType: z.enum(["equal", "exact", "percentage"]),
     splits: z.array(z.object({
         userId: z.string(),
@@ -161,7 +162,7 @@ export async function createCost(projectId: string, data: z.infer<typeof createC
         throw new Error("Unauthorized");
     }
 
-    const { description, amount, category, date, splitType, splits } = createCostSchema.parse(data);
+    const { description, amount, category, date, splitType, splits, billUrl } = createCostSchema.parse(data);
 
     // 1. Create Cost
     const [insertedCost] = await db.insert(costs).values({
@@ -171,6 +172,7 @@ export async function createCost(projectId: string, data: z.infer<typeof createC
         date: new Date(date),
         description,
         category,
+        billUrl,
     }).returning({ id: costs.id });
 
     // 2. Create Splits
