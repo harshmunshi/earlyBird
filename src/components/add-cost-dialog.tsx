@@ -14,6 +14,7 @@ import {
     DialogTrigger,
     DialogFooter
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect, useRef } from "react";
 import { Loader2, Plus, Upload, X } from "lucide-react";
 import { createCost } from "@/lib/actions";
@@ -25,6 +26,7 @@ const schema = z.object({
     category: z.string().min(1, "Category required"),
     date: z.string(),
     billUrl: z.string().optional(),
+    status: z.enum(["tentative", "final"]).default("final"),
     splitType: z.enum(["equal", "exact", "percentage"]),
     splits: z.array(z.object({
         userId: z.string(),
@@ -68,6 +70,7 @@ export function AddCostDialog({ projectId, members }: { projectId: string, membe
             amount: 0,
             date: new Date().toISOString().split('T')[0],
             billUrl: "",
+            status: "final",
             splitType: "equal",
             splits: members.map(m => ({ userId: m.user.id, amount: 0 }))
         }
@@ -143,6 +146,22 @@ export function AddCostDialog({ projectId, members }: { projectId: string, membe
                         <Label htmlFor="description">Description</Label>
                         <Input id="description" placeholder="Lunch, Server costs, etc." {...register("description")} />
                         {errors.description && <p className="text-sm text-destructive">{errors.description.message as string}</p>}
+                    </div>
+
+                    <div className="flex items-start space-x-3 border p-3 rounded-md bg-muted/20">
+                        <Checkbox
+                            id="tentative"
+                            checked={watch("status") === "tentative"}
+                            onCheckedChange={(checked) => setValue("status", checked ? "tentative" : "final")}
+                        />
+                        <div className="grid gap-1.5 leading-none">
+                            <Label htmlFor="tentative" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                Mark as Tentative
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                Tentative costs are not included in the project total until finalized.
+                            </p>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

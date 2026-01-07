@@ -21,7 +21,8 @@ const createCostSchema = z.object({
     amount: z.number(),
     category: z.string(),
     date: z.string(),
-    billUrl: z.string().optional(),
+    billUrl: z.string().nullable().optional(),
+    status: z.enum(["tentative", "final"]).default("final"),
     splitType: z.enum(["equal", "exact", "percentage"]),
     splits: z.array(z.object({
         userId: z.string(),
@@ -162,7 +163,7 @@ export async function createCost(projectId: string, data: z.infer<typeof createC
         throw new Error("Unauthorized");
     }
 
-    const { description, amount, category, date, splitType, splits, billUrl } = createCostSchema.parse(data);
+    const { description, amount, category, date, splitType, splits, billUrl, status } = createCostSchema.parse(data);
 
     // 1. Create Cost
     const [insertedCost] = await db.insert(costs).values({
@@ -173,6 +174,7 @@ export async function createCost(projectId: string, data: z.infer<typeof createC
         description,
         category,
         billUrl,
+        status,
     }).returning({ id: costs.id });
 
     // 2. Create Splits
@@ -231,4 +233,15 @@ export async function inviteMember(projectId: string, email: string) {
 
     revalidatePath(`/dashboard/projects/${projectId}`);
     return { success: true };
+}
+
+export async function finalizeCost(costId: string, projectId: string) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+
+    await db.update(costs)
+        .set({ status: "final" })
+        .where(eq(costs.id, costId));
+
+    revalidatePath(`/dashboard/projects/${projectId}`);
 }

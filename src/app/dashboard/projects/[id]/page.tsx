@@ -1,18 +1,20 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { projects, costs, budgetAllocations } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, ne } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, Calendar, FileText, DollarSign, Wallet, ArrowUpRight } from "lucide-react";
+import { ChevronLeft, Calendar, FileText, DollarSign, Wallet, ArrowUpRight, Check } from "lucide-react";
 import { AddCostDialog } from "@/components/add-cost-dialog";
 import { Button } from "@/components/ui/button";
 import { InviteMemberDialog } from "@/components/invite-member-dialog";
 import { ProjectStats } from "@/components/project-stats";
+import { finalizeCost } from "@/lib/actions";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlannerTab } from "@/components/planner-tab";
 import { BudgetSettingsDialog } from "@/components/budget-settings-dialog";
+import { cn } from "@/lib/utils";
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
     // ... auth ...
@@ -44,7 +46,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     if (!project) return notFound();
 
     // ... calcs ...
-    const totalCost = project.costs.reduce((acc, c) => acc + Number(c.amount), 0);
+    const finalCosts = project.costs.filter(c => c.status === "final");
+    const totalCost = finalCosts.reduce((acc, c) => acc + Number(c.amount), 0);
 
     const memberList = project.members.map(m => ({
         id: m.id,
@@ -62,7 +65,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         id: c.id,
         amount: c.amount,
         date: new Date(c.date),
-        category: c.category
+        category: c.category,
+        status: c.status
     }));
 
     // Cast allocations
@@ -167,13 +171,21 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                     <h2 className="text-xl font-semibold tracking-tight">Recent Expenses</h2>
                                     <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
                                         {project.costs.map((cost) => (
-                                            <div key={cost.id} className="group flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30 transition-colors">
+                                            <div key={cost.id} className={cn(
+                                                "group flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30 transition-colors",
+                                                cost.status === "tentative" && "opacity-75 bg-muted/10 border-dashed"
+                                            )}>
                                                 <div className="flex items-center gap-4">
                                                     <div className="h-10 w-10 rounded-full bg-secondary/50 group-hover:bg-secondary flex items-center justify-center transition-colors">
                                                         <ArrowUpRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium">{cost.description}</p>
+                                                        <p className="font-medium flex items-center gap-2">
+                                                            {cost.description}
+                                                            {cost.status === "tentative" && (
+                                                                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Tentative</span>
+                                                            )}
+                                                        </p>
                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                             <span>{new Date(cost.date).toLocaleDateString()}</span>
                                                             <span>•</span>
@@ -183,8 +195,20 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="font-semibold tabular-nums text-right">
-                                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: project.currency }).format(Number(cost.amount))}
+                                                <div className="flex items-center gap-4">
+                                                    <div className="font-semibold tabular-nums text-right">
+                                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: project.currency }).format(Number(cost.amount))}
+                                                    </div>
+                                                    {cost.status === "tentative" && (
+                                                        <form action={async () => {
+                                                            "use server";
+                                                            await finalizeCost(cost.id, project.id);
+                                                        }}>
+                                                            <Button size="sm" variant="outline" className="h-8 px-2 text-xs border-primary/20 hover:bg-primary/5 hover:text-primary transition-all">
+                                                                <Check className="h-3 w-3 mr-1" /> Finalize
+                                                            </Button>
+                                                        </form>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}

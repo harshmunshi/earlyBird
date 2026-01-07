@@ -13,6 +13,7 @@ import { relations } from "drizzle-orm";
 // Enums
 export const roleEnum = pgEnum("role", ["owner", "member"]);
 export const splitTypeEnum = pgEnum("split_type", ["equal", "exact", "percentage"]);
+export const costStatusEnum = pgEnum("cost_status", ["tentative", "final"]);
 
 // Users
 export const users = pgTable("user", {
@@ -109,6 +110,7 @@ export const costs = pgTable("cost", {
     description: text("description").notNull(),
     category: text("category").notNull(), // Could be an enum or table later
     billUrl: text("bill_url"),
+    status: costStatusEnum("status").default("final").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
