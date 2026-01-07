@@ -19,6 +19,8 @@ function DashboardStats({ userProjects }: { userProjects: any[] }) {
         }
 
         proj.costs.forEach((cost: any) => {
+            if (cost.status !== "final") return;
+
             const amount = Number(cost.amount);
             stats[currency].total += amount;
 
@@ -112,7 +114,9 @@ export default async function DashboardPage() {
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {userProjects.map((project) => {
-                        const totalCost = project.costs.reduce((acc, c) => acc + Number(c.amount), 0);
+                        const totalCost = project.costs
+                            .filter((c: any) => c.status === "final")
+                            .reduce((acc, c) => acc + Number(c.amount), 0);
                         const gradient = getGradient(project.id);
 
                         return (
